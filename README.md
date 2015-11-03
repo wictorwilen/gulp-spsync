@@ -66,3 +66,34 @@ return gulp.src('src/*.*').
 15. Create a folder called `Src`
 16. Add any number of files to the Src folder
 17. Press Ctrl-Shift-B to Build and let Gulp and gulp-spsync upload the files to SharePoint 
+
+# Using Gulp watchers
+
+You can use Gulp watchers (gulp-watch) to upload files as they are changed. 
+The following `gulpfile.js` shows how to upload all files on build and then upload files incrementally when changed and saved.
+
+You need to run `npm install gulp-watch` to install the Gulp watcher
+
+```
+var gulp = require('gulp')
+var sp = require('gulp-spsync')
+var watch = require('gulp-watch')
+
+var settings = {
+			"client_id":"...",
+			"client_secret":"...",
+			"realm" : "",
+			"site" : "https://contoso.sharepoint.com/sites/site",
+			"library": "Documents",
+			"verbose": "true"
+		};
+gulp.task('default', function() {
+	return gulp.src('src/*.*')
+		.pipe(watch('src/*.*'))
+		.pipe(sp(settings))		
+		.pipe(gulp.dest('build'))
+})
+
+```
+
+

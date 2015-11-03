@@ -14,6 +14,13 @@ module.exports = function(options){
 	if(!options.client_secret){
 		throw "The client_secret options parameter is required"
 	}
+	if(!options.site){
+		throw "The site options parameter is required"
+	}
+	if(!options.library){
+		throw "The library options parameter is required"
+	}
+	
 	var getFormattedPrincipal = function (principalName, hostName, realm){
 		var resource = principalName
 		if(hostName != null && hostName != "" ) {
@@ -28,14 +35,15 @@ module.exports = function(options){
 	var S2SProtocol = "OAuth2"
 	var sharePointPrincipal = "00000003-0000-0ff1-ce00-000000000000"
 	var bearer = "Bearer realm=\""
-	
+	var https ="https://"
+	var clientsvc = "/vti_bin/client.svc"
 	var tokens = null
 	
 	var getStsUrl = function(realm){
 		if(options.verbose){
 			gutil.log('Locating STS Url for ' + realm)	
 		}
-		var url = "https://" + globalEndPointPrefix + "." + acsHostUrl + acsMetadataEndPointRelativeUrl + "?realm=" + realm
+		var url = https + globalEndPointPrefix + "." + acsHostUrl + acsMetadataEndPointRelativeUrl + "?realm=" + realm
 		return rp
 			.get(url)
 			.then(function(data){
@@ -57,7 +65,7 @@ module.exports = function(options){
 			gutil.log('Locating realm for ' + targetUrl)	
 		}
 		
-		return rp.post( targetUrl + "/vti_bin/client.svc",{
+		return rp.post( targetUrl + clientsvc,{
 			headers: {
 				"Authorization": "Bearer "
 			},
@@ -82,8 +90,6 @@ module.exports = function(options){
 		targetPrincipalName,
 		targetHost,
 		targetRealm){
-		
-		
 		
 		var resource = getFormattedPrincipal(targetPrincipalName, targetHost, targetRealm)		
 		var clientId = getFormattedPrincipal(options.client_id, "", targetRealm)
@@ -113,14 +119,19 @@ module.exports = function(options){
 	}
 	
 	var uploadFile = function(filename, content){
-		return rp.post(options.site + "/_api/web/lists/getbytitle('" + options.library+"')/RootFolder/Files/add(url='"+filename+"',overwrite=true)",
-		{
+		var headers = {
 			"headers":{
-				"Authorization":"Bearer " + tokens.access_token,
+				"Authorization": "Bearer " + tokens.access_token,
 				"content-type":"application/json;odata=verbose"
 			},
 			"body": content
-		})
+		};
+		return rp.post(
+			options.site + "/_api/web/lists/getbytitle('" + 
+			options.library+"')/RootFolder/Files/add(url='"+
+			filename+"',overwrite=true)",
+			headers
+		)
 		.then(function(success){
 			if(options.verbose){
 				gutil.log('Upload successful')	
@@ -128,9 +139,15 @@ module.exports = function(options){
 			return success	
 		})
 	}
+	
 
 	
 	return through.obj(function(file, enc, cb){
+		
+		var fileDone = function(parameter) {
+			cb(null,file)
+		}
+		
 		if(file.isNull()){
 			cb(null, file)
 			return;
@@ -141,7 +158,7 @@ module.exports = function(options){
 		} 
 
 		var content = file.contents; 
-        if (file.contents.length === 0) { 
+        if (file.contents == null || file.contents.length === 0) { 
              content = ''; 
         } 
 
@@ -152,21 +169,22 @@ module.exports = function(options){
 				return getAppOnlyAccessToken(
 					sharePointPrincipal,
 					u.parse(options.site).hostname,
-					realm).then(function(token){
+					realm)
+					.then(function(token){
 						tokens = token
-						return uploadFile(file.relative, content).then(function(x){cb(null,file)})
+						return uploadFile(file.relative, content).then(fileDone)
 					})
 			}).catch(function(err){
 				cb(new gutil.PluginError("gulp-spsync", err)); 
 			});	
 		} else {
-			return uploadFile(file.relative, content).then(function(x){cb(null,file)})
+			return uploadFile(file.relative, content).then(fileDone)
 		}
 		
 		
 	},function(cb){
 		if(options.verbose){
-			gutil.log("And we're done..")	
+			gutil.log("And we're done...")	
 		}		
 		cb();
 	})
