@@ -4,24 +4,20 @@ Gulp plugin for synchronizing local files with a SharePoint library
 # Features
  
 * Gulp plugin
-* Copies local files to a SharePoint Document library
+* Copies local files to a SharePoint Document libraries and galleries
 
-# Planned features
-* Support for sub folders
-* Support for multiple libraries
- 
 # How to use
 
 1. Prepare SharePoint by registering a SharePoint app using appregnew.aspx. Eg go to https://contoso.sharepoint.com/sites/site/_layouts/15/appregnew.aspx
 2. Click on Generate for both Client Id and Client Secret. For Title, App Domain and Redirect URI, write something you don't care about. Then click on Create
 3. Note down the Client Id and Client Secret, you will need it later
 4. Navigate to appinv.aspx, https://contoso.sharepoint.com/sites/site/_layouts/15/appinv.aspx, enter the client ID in the App Id box and press Lookup
-5. In the Permission Request XML text box enter the following XML and click Create  
+5. In the Permission Request XML text box enter the following XML and click Create (Note: `FullControl` is required to update assets in the Master Page gallery)  
 ```
 <AppPermissionRequests AllowAppOnlyPolicy="true">
     <AppPermissionRequest
         Scope="http://sharepoint/content/sitecollection/web"
-        Right="Manage"/>
+        Right="FullControl"/>
 </AppPermissionRequests>
 ```
 6. In the following consent screen choose to trust the App by clicking on Trust It!
@@ -44,28 +40,29 @@ Gulp plugin for synchronizing local files with a SharePoint library
     ]
 }	
 ```
-12. Create a new file in the root of your folder called `gulpfile.js`, and modify it as follows
+12. Create a new file in the root of your folder called `gulpfile.js`, and modify it as follows. This task will monitor all files in the `Src` folder
 ```
 var gulp = require('gulp')
 var sp = require('gulp-spsync')
 gulp.task('default', function() {
-return gulp.src('src/*.*').
+return gulp.src('src/**/*.*').
     pipe(sp({
         "client_id":"3d271647-2e12-4ae5-9271-04b3aa67dcd3",
         "client_secret":"Zk9ORywN0gaGljrtlxfp+s5vh7ZyWV4dRpOXCLjtl8U=",
         "realm" : "",
         "site" : "https://contoso.sharepoint.com/sites/site",
-        "library": "Site Assets",
         "verbose": "true"
     })).		
     pipe(gulp.dest('build'))
 })
 ```
 13. Replace the client_id and client_secret parameters with the value for the App you just created
-14. Replace the site URL with your site URL and the library name with your library name
-15. Create a folder called `Src`
-16. Add any number of files to the Src folder
-17. Press Ctrl-Shift-B to Build and let Gulp and gulp-spsync upload the files to SharePoint 
+14. Replace the site URL with your site URL
+15. Create a folder called `Src` (you can call it whatever you want, but the tasks above/below uses `Src`)
+16. Create sub folders to the `Src` folder where each Subfolder represents a Library in a site. You can alos create a subfolder called `_catalogs` and 
+add a subfolder to that one called `masterpage` if you want to sync files to the Master Page Gallery.
+17. Add files as you want to these folders
+18. Press Ctrl-Shift-B to Build and let Gulp and gulp-spsync upload the files to SharePoint 
 
 # Using Gulp watchers
 
@@ -84,12 +81,11 @@ var settings = {
 			"client_secret":"...",
 			"realm" : "",
 			"site" : "https://contoso.sharepoint.com/sites/site",
-			"library": "Documents",
 			"verbose": "true"
 		};
 gulp.task('default', function() {
-	return gulp.src('src/*.*')
-		.pipe(watch('src/*.*'))
+	return gulp.src('src/**/*.*')
+		.pipe(watch('src/**/*.*'))
 		.pipe(sp(settings))		
 		.pipe(gulp.dest('build'))
 })

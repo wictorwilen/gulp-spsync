@@ -3,6 +3,7 @@ var through = require('through2')
 var rp = require('request-promise');
 var u = require('url')
 var gutil = require('gulp-util');
+var path = require('path')
 module.exports = function(options){
 	
 	if(!options){
@@ -16,9 +17,6 @@ module.exports = function(options){
 	}
 	if(!options.site){
 		throw "The site options parameter is required"
-	}
-	if(!options.library){
-		throw "The library options parameter is required"
 	}
 	
 	var getFormattedPrincipal = function (principalName, hostName, realm){
@@ -118,7 +116,7 @@ module.exports = function(options){
 				});		
 	}
 	
-	var uploadFile = function(filename, content){
+	var uploadFile = function(file, content){
 		var headers = {
 			"headers":{
 				"Authorization": "Bearer " + tokens.access_token,
@@ -126,10 +124,19 @@ module.exports = function(options){
 			},
 			"body": content
 		};
+		
+		var ix = file.relative.lastIndexOf(path.sep)
+		var library = file.relative.substring(0,ix)
+		var filename = file.relative.substring(ix+1)
+		
+		if(path.sep == "\\"){
+			library = library.replace(/\\/g, "/")
+		}
+		
 		return rp.post(
-			options.site + "/_api/web/lists/getbytitle('" + 
-			options.library+"')/RootFolder/Files/add(url='"+
-			filename+"',overwrite=true)",
+			options.site + "/_api/web/GetFolderByServerRelativeUrl('" + 
+			library +"')/Files/add(url='"+
+			filename +"',overwrite=true)",
 			headers
 		)
 		.then(function(success){
@@ -172,13 +179,13 @@ module.exports = function(options){
 					realm)
 					.then(function(token){
 						tokens = token
-						return uploadFile(file.relative, content).then(fileDone)
+						return uploadFile(file, content).then(fileDone)
 					})
 			}).catch(function(err){
 				cb(new gutil.PluginError("gulp-spsync", err)); 
 			});	
 		} else {
-			return uploadFile(file.relative, content).then(fileDone)
+			return uploadFile(file, content).then(fileDone)
 		}
 		
 		
