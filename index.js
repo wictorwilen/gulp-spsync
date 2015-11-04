@@ -157,6 +157,16 @@ module.exports = function(options){
 			}
 			return success	
 		})
+		.catch(function(err){
+			switch(err.statusCode){
+				case 423:
+					gutil.log("Unable to upload file, it might be checked out to someone")
+					break;
+				default:
+					gutil.log("Unable to upload file, it might be checked out to someone")
+					break;
+			}
+		});
 	}
 	
 
