@@ -4,6 +4,7 @@ var rp = require('request-promise');
 var u = require('url')
 var gutil = require('gulp-util');
 var path = require('path')
+
 module.exports = function(options){
 	
 	if(!options){
@@ -26,6 +27,17 @@ module.exports = function(options){
 		} 
 		resource += "@" + realm
 		return resource
+	}
+	
+	var toDateFromEpoch = function(epoch){
+  		var tmp = parseInt(epoch); 
+		if(tmp<10000000000) tmp *= 1000;	
+		var d = new Date()
+		d.setTime(tmp)
+		return d;
+	}
+	var now = function() {
+		return new Date()
 	}
 	var globalEndPointPrefix = "accounts";
     var acsHostUrl = "accesscontrol.windows.net";
@@ -170,8 +182,8 @@ module.exports = function(options){
         } 
 
 		gutil.log('Uploading ' + file.relative)
-		
-		if(tokens == null){
+				
+		if(tokens == null || now() > toDateFromEpoch(tokens.expires_on) ){
 			getRealmFromTargetUrl(options.site).then(function(realm){
 				return getAppOnlyAccessToken(
 					sharePointPrincipal,
