@@ -23,7 +23,7 @@ Gulp plugin for synchronizing local files with a SharePoint library
 6. In the following consent screen choose to trust the App by clicking on Trust It!
 7. Open a folder using Visual studio code
 8. Run `npm install gulp` to install the Gulp task runner
-9. Run `npm install wictorwilen/gulp-spssync` to install to install the gulp-spsync 
+9. Run `npm install wictorwilen/gulp-spsync` to install to install the gulp-spsync 
 10. Press Ctrl-Shift-P, type Task and choose to Configure Task Runner
 11. In the tasks.json file that is being created replace the contents with the following:
 ```
