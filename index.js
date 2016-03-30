@@ -138,7 +138,17 @@ module.exports = function(options){
 		};
 		
 		var ix = file.relative.lastIndexOf(path.sep)
-		var library = file.relative.substring(0,ix)
+        var ix2 = 0;
+        if(options.startFolder) {
+            ix2 = file.relative.indexOf(options.startFolder) + options.startFolder.length + 1
+            if(ix2 == -1) {
+                ix2 = 0
+            }
+        }
+		var library = file.relative.substring(ix2,ix)
+        if(options.verbose){
+            gutil.log('Using library: ' + library)	
+        }
 		var filename = file.relative.substring(ix+1)
 		
 		if(path.sep == "\\"){

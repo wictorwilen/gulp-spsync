@@ -91,5 +91,26 @@ gulp.task('default', function() {
 })
 
 ```
+# Using nested folders (new in 1.4.0)
 
+If you're using nested folders or deep structures, you can choose the name of the "start folder", using the `startFolder` option. 
+Assume you have your SharePoint files under `src/template1/_sp/_catalogs` and `src/template2/_sp/_catalogs/` then you can use `"startFolder"="_sp"` to make sure that the first folder names are stripped.
 
+```
+var gulp = require('gulp')
+var sp = require('gulp-spsync')
+
+var settings = {
+			"client_id":"...",
+			"client_secret":"...",
+			"realm" : "",
+			"site" : "https://contoso.sharepoint.com/sites/site",
+			"verbose": "true",
+            "startFolder":"_sp"
+		};
+gulp.task('default', function() {
+	return gulp.src('src/**/_sp/**/*.*')
+		.pipe(sp(settings))		
+})
+
+```
