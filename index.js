@@ -3,7 +3,8 @@ var through = require('through2')
 var rp = require('request-promise');
 var u = require('url')
 var gutil = require('gulp-util');
-var path = require('path')
+var path = require('path');
+var util = require("util");
 
 module.exports = function(options){
 	
@@ -155,32 +156,136 @@ module.exports = function(options){
 			library = library.replace(/\\/g, "/")
 		}
 		
-		return rp.post(
-			options.site + "/_api/web/GetFolderByServerRelativeUrl('" + 
-			library +"')/Files/add(url='"+
-			filename +"',overwrite=true)",
-			headers
-		)
-		.then(function(success){
-			if(options.verbose){
-				gutil.log('Upload successful')	
-			}
-			return success	
-		})
-		.catch(function(err){
-			switch(err.statusCode){
-				case 423:
-					gutil.log("Unable to upload file, it might be checked out to someone")
-					break;
-				default:
-					gutil.log("Unable to upload file, it might be checked out to someone")
-					break;
-			}
+		return checkFoldersAndCreateIfNotExist(library, filename, options, tokens).then(function() {
+			return rp.post(
+				options.site + "/_api/web/GetFolderByServerRelativeUrl('" + 
+				library +"')/Files/add(url='"+
+				filename +"',overwrite=true)",
+				headers
+			)
+			.then(function(success){
+				if(options.verbose){
+					gutil.log('Upload successful')	
+				}
+				return success	
+			})
+			.catch(function(err){
+				switch(err.statusCode){
+					case 423:
+						gutil.log("Unable to upload file, it might be checked out to someone")
+						break;
+					default:
+						gutil.log("Unable to upload file, it might be checked out to someone")
+						break;
+				}
+			});
 		});
 	}
 	
-
+	var checkFoldersAndCreateIfNotExist = function(library, filename, options, tokens) {
+		var foldersArray = getFolderPathsArray(library);
+		var proms = [];
+		foldersArray.forEach(function (val, index) {
+			proms.push(checkFolderExists(val));
+		});
+		
+		return Promise.all(proms)
+			.then(function(data) {
+				var erroredIndexes = data.map(function (val, index) {
+				if (val.error) {
+					return index;
+				}
+			}).filter(function (x) { return x != undefined });
+			var pathArray = [];
+			erroredIndexes.forEach(function (val, index) {
+				var path = foldersArray[val];
+				pathArray.push(path);
+			})
+			if (pathArray.length > 0) {
+				return createPathRecursive(pathArray, library, filename, options, tokens);
+			}
+		});
+		
+	}
 	
+	var checkFolderExists = function(folderName) {
+		var getFolderUrl = util.format("/_api/web/GetFolderByServerRelativeUrl(@FolderName)" +
+			"?@FolderName='%s'", encodeURIComponent(folderName));
+        var opts = {
+			headers: {
+				"Accept": "application/json;odata=verbose",
+                "Authorization": "Bearer " + tokens.access_token,
+                "content-type":"application/json;odata=verbose"
+			},
+			json: true
+		};
+		var endPoint = options.site + getFolderUrl;
+		gutil.log ("Checking folder exists " + endPoint);
+		return rp.get(endPoint, opts)
+			.then(function (success) {
+				gutil.log('Folder ' + folderName + ' exists');
+				return success;
+			})
+			.catch(function(err) {
+				gutil.log("INFO: Folder '" + folderName + "' doesn't exist and will be created");
+				return err;
+			});
+	}
+	
+	var createPathRecursive = function(path, library, filename, options, tokens) {
+		gutil.log("Creating path " + path[0]);
+		
+		var setFolder = util.format("/_api/web/folders");
+		var body = "{'__metadata': {'type': 'SP.Folder'}, 'ServerRelativeUrl': '" + path[0] + "'}";
+		var opts = {
+			headers: {
+				"Accept": "application/json;odata=verbose",
+				"Authorization": "Bearer " + tokens.access_token,
+				"content-type": "application/json;odata=verbose",
+				"content-length": Buffer.byteLength(body)
+			},
+			body: body
+		};
+				  
+		return new Promise(function (resolve) {
+				rp.post(options.site + setFolder, opts)
+				.then(function (res) {
+					resolve(path.slice(1, path.length));
+				})
+				.catch(function(err) {
+					gutil.log("ERR: " + err);
+					return err;
+				});
+		})
+		.then(function (path) {
+			if (path.length > 0) {
+				return createPathRecursive(path, library, filename, options, tokens);
+			}
+			return true;
+		});		
+	}
+	
+	var getFolderPathsArray = function (folder) {
+		if (endsWith(folder, "/") && folder !== "/") {
+			folder = folder.slice(0, -1);
+		}
+
+		var folderNamesArray = folder.split('/');
+		var foldersArray = [];
+		for (var i = 0; i < folderNamesArray.length; i++) {
+			var pathArray = [];
+			for (var r = 0; r <= i; r++) {
+				pathArray.push(folderNamesArray[r]);
+			}
+			foldersArray.push(pathArray.join('/'));
+		}
+		return foldersArray;
+	}
+
+	var endsWith = function(str, suffix) {
+		return str.indexOf(suffix, str.length - suffix.length) !== -1;
+	}
+
 	return through.obj(function(file, enc, cb){
 		
 		var fileDone = function(parameter) {

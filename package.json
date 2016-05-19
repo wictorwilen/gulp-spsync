@@ -16,14 +16,14 @@
     "sync",
     "file",
     "tool",
-    "office365"    
+    "office365"
   ],
   "dependencies": {
-        "through2": "^2.0.0",
-        "request-promise": "^1.0.2",
-        "url": "^0.11.0",
-        "gulp-util": "^3.0.7"
-  }, 
+    "through2": "^2.0.0",
+    "request-promise": "^1.0.2",
+    "url": "^0.11.0",
+    "gulp-util": "^3.0.7"
+  },
   "author": "Wictor Wilén",
   "license": "MIT",
   "bugs": {
@@ -34,5 +34,9 @@
     {
       "name": "wictor",
       "email": "wictor@wictorwilen.se"
-    }]
+    }
+  ],
+  "devDependencies": {
+    "util": "^0.10.3"
+  }
 }
