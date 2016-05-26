@@ -164,9 +164,9 @@ module.exports = function(options){
 				headers
 			)
 			.then(function(success){
-				if(options.verbose){
-					gutil.log('Upload successful')	
-				}
+				//if(options.verbose){
+					gutil.log(gutil.colors.green('Upload successful'))	
+				//}
 				return success	
 			})
 			.catch(function(err){
@@ -220,10 +220,14 @@ module.exports = function(options){
 			json: true
 		};
 		var endPoint = options.site + getFolderUrl;
-		gutil.log ("Checking folder exists " + endPoint);
+		if(options.verbose){
+			gutil.log("Checking folder exists " + endPoint);
+		}
 		return rp.get(endPoint, opts)
 			.then(function (success) {
-				gutil.log('Folder ' + folderName + ' exists');
+				if(options.verbose){
+					gutil.log('Folder ' + folderName + ' exists');
+				}
 				return success;
 			})
 			.catch(function(err) {
