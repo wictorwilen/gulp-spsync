@@ -186,6 +186,11 @@ module.exports = function(args){
 			}).catch(function(err){
 				gutil.log(gutil.colors.red("Unable to update metadata of the file"));
 			});
+		} else {
+			// Check if the file has to be published
+			if (options.publish) {
+				publishFile(filename, library, tokens);
+			}
 		}
 	}
 	
