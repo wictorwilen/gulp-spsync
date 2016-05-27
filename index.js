@@ -6,19 +6,38 @@ var gutil = require('gulp-util');
 var path = require('path');
 var util = require("util");
 
-module.exports = function(options){
+module.exports = function(args){
+	var options = {
+		client_id: "",
+		client_secret: "",
+		realm: "",
+		site: "",
+		verbose: false,
+		watch: false
+	}
 	
-	if(!options){
+	if(!args){
 		throw "options required"
 	}
-	if(!options.client_id){
+	if(!args.client_id){
 		throw "The client_id options parameter is required"
 	}
-	if(!options.client_secret){
+	if(!args.client_secret){
 		throw "The client_secret options parameter is required"
 	}
-	if(!options.site){
+	if(!args.site){
 		throw "The site options parameter is required"
+	}
+	
+	if (args) {
+		// Required properties
+		options.client_id = args.client_id;
+		options.client_secret = args.client_secret;
+		options.site = args.site;
+		// Default properties or configured via the gulp script
+		options.realm = args.realm || options.realm;
+		options.verbose = args.verbose || options.verbose;
+		options.watch = args.watch || options.watch;
 	}
 	
 	var getFormattedPrincipal = function (principalName, hostName, realm){
@@ -291,6 +310,14 @@ module.exports = function(options){
 	}
 
 	return through.obj(function(file, enc, cb){
+		// If watch is set to true, only upload the changed files
+		if (options.watch && file.event !== "change") {
+			if(options.verbose){
+				gutil.log("Skipping:", gutil.colors.yellow(file.relative))
+			}
+			cb(null,file)
+			return;
+		}
 		
 		var fileDone = function(parameter) {
 			cb(null,file)
@@ -328,8 +355,6 @@ module.exports = function(options){
 		} else {
 			return uploadFile(file, content).then(fileDone)
 		}
-		
-		
 	},function(cb){
 		if(options.verbose){
 			gutil.log("And we're done...")	
