@@ -154,82 +154,87 @@ module.exports = function(args){
 				});		
 	}
 	
-	var updateFileMetadata = function(filename, library, tokens) {
-		// Check if the filename is in the array with metadata
-		var fileMetadata = options.files_metadata.filter(function (fm) {
-			if (fm.name === filename) {
-				return fm;
+	var updateFileMetadata = function(file, resolve, reject) {
+		if (options.update_metadata) {
+			if (options.files_metadata.length <= 0) {
+				resolve(true);
 			}
-		});
-		// Check if metadata has been retrieved for the file
-		if (fileMetadata.length > 0) {
-			var metadata = fileMetadata[0].metadata;
-			var metadataHeader = {
-				"headers":{
-					"Authorization": "Bearer " + tokens.access_token,
-					"content-type":"application/json;odata=verbose",
-					"X-HTTP-Method": "PATCH",
-					"If-Match": "*"
-				},
-				"body": JSON.stringify(metadata) 
-			};
-			rp.post(
-				options.site + "/_api/web/GetFolderByServerRelativeUrl('" + library +"')/Files('"+filename +"')/listitemallfields",
-				metadataHeader
-			).then(function(postData) {
-				if (options.publish) {
-					publishFile(filename, library, tokens);
-				} else {
-					gutil.log(gutil.colors.green('Uploaded and metadata added successful'));
-					return postData;
+			// Get file context
+			var fileCtx = getFileContext(file);
+			var library = fileCtx.library;
+			var filename = fileCtx.filename;
+			// Check if the filename is in the array with metadata
+			var fileMetadata = options.files_metadata.filter(function (fm) {
+				if (fm.name === filename) {
+					return fm;
 				}
-			}).catch(function(err){
-				gutil.log(gutil.colors.red("Unable to update metadata of the file"));
 			});
-		} else {
-			// Check if the file has to be published
-			if (options.publish) {
-				publishFile(filename, library, tokens);
+			// Check if metadata has been retrieved for the file
+			if (fileMetadata.length > 0) {
+				var metadata = fileMetadata[0].metadata;
+				var metadataHeader = {
+					"headers":{
+						"Authorization": "Bearer " + tokens.access_token,
+						"content-type":"application/json;odata=verbose",
+						"X-HTTP-Method": "PATCH",
+						"If-Match": "*"
+					},
+					"body": JSON.stringify(metadata) 
+				};
+				rp.post(
+					options.site + "/_api/web/GetFolderByServerRelativeUrl('" + library +"')/Files('"+filename +"')/listitemallfields",
+					metadataHeader
+				).then(function(postData) {
+					gutil.log(gutil.colors.green('Metadata updated successful'));
+					resolve(postData);
+				}).catch(function(err){
+					gutil.log(gutil.colors.red("Unable to update metadata of the file"));
+					reject(err);
+				});
+			} else {
+				// Nothing to do, no metadata for the file
+				resolve(true);
 			}
+		} else {
+			resolve(true);
 		}
 	}
 	
-	var publishFile = function (filename, library, tokens) {
-		var publishHeader = {
-			"headers":{
-				"Authorization": "Bearer " + tokens.access_token,
-				"content-type":"application/json;odata=verbose"
-			}
-		};
-		// First check out the file
-		rp.post(
-			options.site + "/_api/web/GetFolderByServerRelativeUrl('" + library +"')/Files('"+filename +"')/CheckOut()",
-			publishHeader
-		).then(function(result){
-			// Check in major version
+	var publishFile = function (file, resolve, reject) {
+		// Get file context
+		var fileCtx = getFileContext(file);
+		var library = fileCtx.library;
+		var filename = fileCtx.filename;
+		if (options.publish) {
+			var publishHeader = {
+				"headers":{
+					"Authorization": "Bearer " + tokens.access_token,
+					"content-type":"application/json;odata=verbose"
+				}
+			};
+			// First check out the file
 			rp.post(
-				options.site + "/_api/web/GetFolderByServerRelativeUrl('" + library +"')/Files('"+filename +"')/CheckIn(comment='Checked in via GULP', checkintype=1)",
+				options.site + "/_api/web/GetFolderByServerRelativeUrl('" + library +"')/Files('"+filename +"')/CheckOut()",
 				publishHeader
-			).then(function (result) {
-				gutil.log(gutil.colors.green('Published file'));
-				return result;
-			})
-		}).catch(function(err){
-			gutil.log(gutil.colors.red("Unable to publish file"));
-			gutil.log(gutil.colors.red(err));
-		});
+			).then(function(result){
+				// Check in major version
+				rp.post(
+					options.site + "/_api/web/GetFolderByServerRelativeUrl('" + library +"')/Files('"+filename +"')/CheckIn(comment='Checked in via GULP', checkintype=1)",
+					publishHeader
+				).then(function (result) {
+					gutil.log(gutil.colors.green('Published file'));
+					resolve(result);
+				})
+			}).catch(function(err){
+				gutil.log(gutil.colors.red("Unable to publish file"));
+				reject(err);
+			});
+		} else {
+			resolve(true);
+		}
 	}
 	
-	var uploadFile = function(file, content){
-		var headers = {
-			"headers":{
-				"Authorization": "Bearer " + tokens.access_token,
-				"content-type":"application/json;odata=verbose",
-				"accept":"application/json;odata=verbose"
-			},
-			"body": content
-		};
-		
+	var getFileContext = function(file) {
 		var ix = file.relative.lastIndexOf(path.sep)
         var ix2 = 0;
         if(options.startFolder) {
@@ -243,39 +248,63 @@ module.exports = function(args){
             gutil.log('Using library: ' + library)	
         }
 		var filename = file.relative.substring(ix+1)
+		return {
+			library: library,
+			filename: filename
+		};
+	}
+	
+	var uploadFile = function(file, content){
+		var headers = {
+			"headers":{
+				"Authorization": "Bearer " + tokens.access_token,
+				"content-type":"application/json;odata=verbose",
+				"accept":"application/json;odata=verbose"
+			},
+			"body": content
+		};
+		
+		var fileCtx = getFileContext(file);
+		var library = fileCtx.library;
+		var filename = fileCtx.filename;
 		
 		if(path.sep == "\\"){
 			library = library.replace(/\\/g, "/")
 		}
 		
 		return checkFoldersAndCreateIfNotExist(library, filename, options, tokens).then(function() {
-			return rp.post(
-				options.site + "/_api/web/GetFolderByServerRelativeUrl('" + 
-				library +"')/Files/add(url='"+
-				filename +"',overwrite=true)",
-				headers
-			)
-			.then(function(success) {
-				if (options.files_metadata.length > 0 && options.update_metadata) {
-					updateFileMetadata(filename, library, tokens);
-				} else {
-					if (options.publish) {
-						publishFile(filename, library, tokens);
-					} else {
-						gutil.log(gutil.colors.green('Upload successful'))	
-						return success;
+			return new Promise(function (resolve, reject) {
+				rp.post(
+					options.site + "/_api/web/GetFolderByServerRelativeUrl('" + 
+					library +"')/Files/add(url='"+
+					filename +"',overwrite=true)",
+					headers
+				)
+				.then(function(success) {
+					gutil.log(gutil.colors.green('Upload successful'));
+					resolve(success);
+				})
+				.catch(function(err){
+					switch(err.statusCode){
+						case 423:
+							gutil.log(gutil.colors.red("Unable to upload file, it might be checked out to someone"))
+							break;
+						default:
+							gutil.log(gutil.colors.red("Unable to upload file, it might be checked out to someone"))
+							break;
 					}
-				}
-			})
-			.catch(function(err){
-				switch(err.statusCode){
-					case 423:
-						gutil.log(gutil.colors.red("Unable to upload file, it might be checked out to someone"))
-						break;
-					default:
-						gutil.log(gutil.colors.red("Unable to upload file, it might be checked out to someone"))
-						break;
-				}
+					reject(err);
+				});
+			});
+		}).then(function() {
+			// Update file metadata
+			return new Promise(function (resolve, reject) {
+				updateFileMetadata(file, resolve, reject);
+			});
+		}).then(function(){
+			// Publish file
+			return new Promise(function (resolve, reject) {
+				publishFile(file, resolve, reject)
 			});
 		});
 	}
@@ -290,20 +319,20 @@ module.exports = function(args){
 		return Promise.all(proms)
 			.then(function(data) {
 				var erroredIndexes = data.map(function (val, index) {
-				if (val.error) {
-					return index;
+					if (val.error) {
+						return index;
+					}
+				}).filter(function (x) { return x != undefined });
+				var pathArray = [];
+				erroredIndexes.forEach(function (val, index) {
+					var path = foldersArray[val];
+					pathArray.push(path);
+				})
+				if (pathArray.length > 0) {
+					return createPathRecursive(pathArray, library, filename, options, tokens);
 				}
-			}).filter(function (x) { return x != undefined });
-			var pathArray = [];
-			erroredIndexes.forEach(function (val, index) {
-				var path = foldersArray[val];
-				pathArray.push(path);
-			})
-			if (pathArray.length > 0) {
-				return createPathRecursive(pathArray, library, filename, options, tokens);
 			}
-		});
-		
+		);
 	}
 	
 	var checkFolderExists = function(folderName) {
