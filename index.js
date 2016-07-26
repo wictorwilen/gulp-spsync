@@ -6,19 +6,44 @@ var gutil = require('gulp-util');
 var path = require('path');
 var util = require("util");
 
-module.exports = function(options){
+module.exports = function(args){
+	var options = {
+		client_id: "",
+		client_secret: "",
+		realm: "",
+		site: "",
+		verbose: false,
+		watch: false,
+		update_metadata: false,
+		files_metadata: [],
+		publish: false
+	}
 	
-	if(!options){
+	if(!args){
 		throw "options required"
 	}
-	if(!options.client_id){
+	if(!args.client_id){
 		throw "The client_id options parameter is required"
 	}
-	if(!options.client_secret){
+	if(!args.client_secret){
 		throw "The client_secret options parameter is required"
 	}
-	if(!options.site){
+	if(!args.site){
 		throw "The site options parameter is required"
+	}
+	
+	if (args) {
+		// Required properties
+		options.client_id = args.client_id;
+		options.client_secret = args.client_secret;
+		options.site = args.site;
+		// Default properties or configured via the gulp script
+		options.realm = args.realm || options.realm;
+		options.verbose = args.verbose || options.verbose;
+		options.watch = args.watch || options.watch;
+		options.update_metadata = args.update_metadata || options.update_metadata;
+		options.files_metadata = args.files_metadata || options.files_metadata;
+		options.publish = args.publish || options.publish;
 	}
 	
 	var getFormattedPrincipal = function (principalName, hostName, realm){
@@ -129,15 +154,87 @@ module.exports = function(options){
 				});		
 	}
 	
-	var uploadFile = function(file, content){
-		var headers = {
-			"headers":{
-				"Authorization": "Bearer " + tokens.access_token,
-				"content-type":"application/json;odata=verbose"
-			},
-			"body": content
-		};
-		
+	var updateFileMetadata = function(file, resolve, reject) {
+		if (options.update_metadata) {
+			if (options.files_metadata.length <= 0) {
+				resolve(true);
+			}
+			// Get file context
+			var fileCtx = getFileContext(file);
+			var library = fileCtx.library;
+			var filename = fileCtx.filename;
+			// Check if the filename is in the array with metadata
+			var fileMetadata = options.files_metadata.filter(function (fm) {
+				if (fm.name === filename) {
+					return fm;
+				}
+			});
+			// Check if metadata has been retrieved for the file
+			if (fileMetadata.length > 0) {
+				var metadata = fileMetadata[0].metadata;
+				var metadataHeader = {
+					"headers":{
+						"Authorization": "Bearer " + tokens.access_token,
+						"content-type":"application/json;odata=verbose",
+						"X-HTTP-Method": "PATCH",
+						"If-Match": "*"
+					},
+					"body": JSON.stringify(metadata) 
+				};
+				rp.post(
+					options.site + "/_api/web/GetFolderByServerRelativeUrl('" + library +"')/Files('"+filename +"')/listitemallfields",
+					metadataHeader
+				).then(function(postData) {
+					gutil.log(gutil.colors.green('Metadata updated successful'));
+					resolve(postData);
+				}).catch(function(err){
+					gutil.log(gutil.colors.red("Unable to update metadata of the file"));
+					reject(err);
+				});
+			} else {
+				// Nothing to do, no metadata for the file
+				resolve(true);
+			}
+		} else {
+			resolve(true);
+		}
+	}
+	
+	var publishFile = function (file, resolve, reject) {
+		// Get file context
+		var fileCtx = getFileContext(file);
+		var library = fileCtx.library;
+		var filename = fileCtx.filename;
+		if (options.publish) {
+			var publishHeader = {
+				"headers":{
+					"Authorization": "Bearer " + tokens.access_token,
+					"content-type":"application/json;odata=verbose"
+				}
+			};
+			// First check out the file
+			rp.post(
+				options.site + "/_api/web/GetFolderByServerRelativeUrl('" + library +"')/Files('"+filename +"')/CheckOut()",
+				publishHeader
+			).then(function(result){
+				// Check in major version
+				rp.post(
+					options.site + "/_api/web/GetFolderByServerRelativeUrl('" + library +"')/Files('"+filename +"')/CheckIn(comment='Checked in via GULP', checkintype=1)",
+					publishHeader
+				).then(function (result) {
+					gutil.log(gutil.colors.green('Published file'));
+					resolve(result);
+				})
+			}).catch(function(err){
+				gutil.log(gutil.colors.red("Unable to publish file"));
+				reject(err);
+			});
+		} else {
+			resolve(true);
+		}
+	}
+	
+	var getFileContext = function(file) {
 		var ix = file.relative.lastIndexOf(path.sep)
         var ix2 = 0;
         if(options.startFolder) {
@@ -151,33 +248,63 @@ module.exports = function(options){
             gutil.log('Using library: ' + library)	
         }
 		var filename = file.relative.substring(ix+1)
+		return {
+			library: library,
+			filename: filename
+		};
+	}
+	
+	var uploadFile = function(file, content){
+		var headers = {
+			"headers":{
+				"Authorization": "Bearer " + tokens.access_token,
+				"content-type":"application/json;odata=verbose",
+				"accept":"application/json;odata=verbose"
+			},
+			"body": content
+		};
+		
+		var fileCtx = getFileContext(file);
+		var library = fileCtx.library;
+		var filename = fileCtx.filename;
 		
 		if(path.sep == "\\"){
 			library = library.replace(/\\/g, "/")
 		}
 		
 		return checkFoldersAndCreateIfNotExist(library, filename, options, tokens).then(function() {
-			return rp.post(
-				options.site + "/_api/web/GetFolderByServerRelativeUrl('" + 
-				library +"')/Files/add(url='"+
-				filename +"',overwrite=true)",
-				headers
-			)
-			.then(function(success){
-				if(options.verbose){
-					gutil.log('Upload successful')	
-				}
-				return success	
-			})
-			.catch(function(err){
-				switch(err.statusCode){
-					case 423:
-						gutil.log("Unable to upload file, it might be checked out to someone")
-						break;
-					default:
-						gutil.log("Unable to upload file, it might be checked out to someone")
-						break;
-				}
+			return new Promise(function (resolve, reject) {
+				rp.post(
+					options.site + "/_api/web/GetFolderByServerRelativeUrl('" + 
+					library +"')/Files/add(url='"+
+					filename +"',overwrite=true)",
+					headers
+				)
+				.then(function(success) {
+					gutil.log(gutil.colors.green('Upload successful'));
+					resolve(success);
+				})
+				.catch(function(err){
+					switch(err.statusCode){
+						case 423:
+							gutil.log(gutil.colors.red("Unable to upload file, it might be checked out to someone"))
+							break;
+						default:
+							gutil.log(gutil.colors.red("Unable to upload file, it might be checked out to someone"))
+							break;
+					}
+					reject(err);
+				});
+			});
+		}).then(function() {
+			// Update file metadata
+			return new Promise(function (resolve, reject) {
+				updateFileMetadata(file, resolve, reject);
+			});
+		}).then(function(){
+			// Publish file
+			return new Promise(function (resolve, reject) {
+				publishFile(file, resolve, reject)
 			});
 		});
 	}
@@ -192,20 +319,20 @@ module.exports = function(options){
 		return Promise.all(proms)
 			.then(function(data) {
 				var erroredIndexes = data.map(function (val, index) {
-				if (val.error) {
-					return index;
+					if (val.error) {
+						return index;
+					}
+				}).filter(function (x) { return x != undefined });
+				var pathArray = [];
+				erroredIndexes.forEach(function (val, index) {
+					var path = foldersArray[val];
+					pathArray.push(path);
+				})
+				if (pathArray.length > 0) {
+					return createPathRecursive(pathArray, library, filename, options, tokens);
 				}
-			}).filter(function (x) { return x != undefined });
-			var pathArray = [];
-			erroredIndexes.forEach(function (val, index) {
-				var path = foldersArray[val];
-				pathArray.push(path);
-			})
-			if (pathArray.length > 0) {
-				return createPathRecursive(pathArray, library, filename, options, tokens);
 			}
-		});
-		
+		);
 	}
 	
 	var checkFolderExists = function(folderName) {
@@ -220,10 +347,14 @@ module.exports = function(options){
 			json: true
 		};
 		var endPoint = options.site + getFolderUrl;
-		gutil.log ("Checking folder exists " + endPoint);
+		if(options.verbose){
+			gutil.log("Checking folder exists " + endPoint);
+		}
 		return rp.get(endPoint, opts)
 			.then(function (success) {
-				gutil.log('Folder ' + folderName + ' exists');
+				if(options.verbose){
+					gutil.log('Folder ' + folderName + ' exists');
+				}
 				return success;
 			})
 			.catch(function(err) {
@@ -233,8 +364,9 @@ module.exports = function(options){
 	}
 	
 	var createPathRecursive = function(path, library, filename, options, tokens) {
-		gutil.log("Creating path " + path[0]);
-		
+		if(options.verbose){
+			gutil.log("Creating path " + path[0]);
+		}
 		var setFolder = util.format("/_api/web/folders");
 		var body = "{'__metadata': {'type': 'SP.Folder'}, 'ServerRelativeUrl': '" + path[0] + "'}";
 		var opts = {
@@ -248,14 +380,14 @@ module.exports = function(options){
 		};
 				  
 		return new Promise(function (resolve) {
-				rp.post(options.site + setFolder, opts)
-				.then(function (res) {
-					resolve(path.slice(1, path.length));
-				})
-				.catch(function(err) {
-					gutil.log("ERR: " + err);
-					return err;
-				});
+			rp.post(options.site + setFolder, opts)
+			.then(function (res) {
+				resolve(path.slice(1, path.length));
+			})
+			.catch(function(err) {
+				gutil.log("ERR: " + err);
+				return err;
+			});
 		})
 		.then(function (path) {
 			if (path.length > 0) {
@@ -287,6 +419,14 @@ module.exports = function(options){
 	}
 
 	return through.obj(function(file, enc, cb){
+		// If watch is set to true, only upload the changed files
+		if (options.watch && file.event !== "change") {
+			if(options.verbose){
+				gutil.log("Skipping:", gutil.colors.yellow(file.relative))
+			}
+			cb(null,file)
+			return;
+		}
 		
 		var fileDone = function(parameter) {
 			cb(null,file)
@@ -324,8 +464,6 @@ module.exports = function(options){
 		} else {
 			return uploadFile(file, content).then(fileDone)
 		}
-		
-		
 	},function(cb){
 		if(options.verbose){
 			gutil.log("And we're done...")	
