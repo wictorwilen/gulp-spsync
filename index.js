@@ -44,6 +44,7 @@ module.exports = function(args){
 		options.update_metadata = args.update_metadata || options.update_metadata;
 		options.files_metadata = args.files_metadata || options.files_metadata;
 		options.publish = args.publish || options.publish;
+		options.startFolder = args.startFolder || "";
 	}
 	
 	var getFormattedPrincipal = function (principalName, hostName, realm){
