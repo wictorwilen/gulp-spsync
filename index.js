@@ -40,6 +40,12 @@ module.exports = function(args){
 		// Default properties or configured via the gulp script
 		options.realm = args.realm || options.realm;
 		options.verbose = args.verbose || options.verbose;
+		if (typeof (options.verbose) === 'string') {
+			options.verbose = options.verbose === 'true';
+		}
+		if (options.verbose) {
+			gutil.log('Verbose logging on!')
+		}
 		options.watch = args.watch || options.watch;
 		options.update_metadata = args.update_metadata || options.update_metadata;
 		options.files_metadata = args.files_metadata || options.files_metadata;
