@@ -16,7 +16,8 @@ module.exports = function(args){
 		watch: false,
 		update_metadata: false,
 		files_metadata: [],
-		publish: false
+		publish: false,
+		libraryPath: ""
 	}
 	
 	if(!args){
@@ -51,6 +52,7 @@ module.exports = function(args){
 		options.files_metadata = args.files_metadata || options.files_metadata;
 		options.publish = args.publish || options.publish;
 		options.startFolder = args.startFolder || "";
+		options.libraryPath = args.libraryPath || "";
 	}
 	
 	var getFormattedPrincipal = function (principalName, hostName, realm){
@@ -256,7 +258,7 @@ module.exports = function(args){
         }
 		var filename = file.relative.substring(ix+1)
 		return {
-			library: library,
+			library: options.libraryPath !== "" ? options.libraryPath + path.sep + library : library,
 			filename: filename
 		};
 	}

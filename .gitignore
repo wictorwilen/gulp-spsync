@@ -1,1 +1,4 @@
 node_modules
+gulpfile.js
+tests
+.vscode
