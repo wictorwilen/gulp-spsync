@@ -438,11 +438,11 @@ module.exports = function(args){
 		}
 		
 		var fileDone = function(parameter) {
-			cb(null,file)
+			cb()
 		}
 		
 		if(file.isNull()){
-			cb(null, file)
+			cb()
 			return;
 		}
 		if (file.isStream()) { 
