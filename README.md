@@ -81,7 +81,8 @@ var settings = {
 			"client_secret":"...",
 			"realm" : "",
 			"site" : "https://contoso.sharepoint.com/sites/site",
-			"verbose": "true"
+			"verbose": "true",
+			"watcher": "true
 		};
 gulp.task('default', function() {
 	return gulp.src('src/**/*.*')
