@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/) 
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.5.9] - 2018-08-18
+### Security
+- Fixed 5 moderate security issues, by updating the request package
+
 ## [1.5.8] - 2018-08-18
 ### Fix
 - Update to documentation

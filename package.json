@@ -1,6 +1,6 @@
 {
   "name": "gulp-spsync",
-  "version": "1.5.8",
+  "version": "1.5.9",
   "description": "Gulp plugin that syncs with a library in SharePoint Online",
   "main": "index.js",
   "scripts": {
@@ -20,7 +20,7 @@
   ],
   "dependencies": {
     "gulp-util": "3.0.8",
-    "request": "2.79.0",
+    "request": "^2.88.0",
     "request-promise": "4.1.1",
     "through2": "2.0.3",
     "url": "0.11.0",
