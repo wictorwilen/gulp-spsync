@@ -82,7 +82,7 @@ var settings = {
 			"realm" : "",
 			"site" : "https://contoso.sharepoint.com/sites/site",
 			"verbose": "true",
-			"watcher": "true
+			"watch": true
 		};
 gulp.task('default', function() {
 	return gulp.src('src/**/*.*')
